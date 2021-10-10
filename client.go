@@ -6,15 +6,20 @@ import (
 )
 
 type File struct {
+	name      string
 	extension string
 	data      []byte
 }
 
-func client(clientDia net.Conn, messages *[]*string, files *[]*File) {
+func client(clientDial net.Conn, messages *[]*string, files *[]*File) {
+
+}
+
+func test(messages *[]*string) {
 	for i := 0; i < 3; i++ {
-		var str *string
-		*str = "Hola"
-		*messages = append(*messages, str)
+		var str string
+		str = "Hola"
+		*messages = append(*messages, &str)
 	}
 }
 
@@ -22,19 +27,16 @@ func main() {
 	clientDial, err := net.Dial("tcp", ":9999")
 	if err != nil {
 		fmt.Println("Error initializing client: ", err)
+		return
 	}
 
 	var (
 		opt      int = 0
-		messages *[]*string
-		files    *[]*File
+		messages []*string
+		files    []*File
 	)
 
-	go client(clientDial, messages, files)
-
-	for _, v := range *messages {
-		fmt.Println(v)
-	}
+	go client(clientDial, &messages, &files)
 
 	for opt != 4 {
 		fmt.Println("Welcome to the ChatRoom!")

@@ -5,7 +5,32 @@ import (
 	"net"
 )
 
-func server(serverListener net.Listener) {
+type File struct {
+	name      string
+	extension string
+	data      []byte
+}
+
+func server(serverListener net.Listener, messages *[]*string, files *[]*File, clients *[]*net.Conn) {
+	for {
+		client, err := serverListener.Accept()
+		if err != nil {
+			fmt.Println("Error connecting with client: ", err)
+			continue
+		}
+		go handleClient(client, messages, files, clients)
+	}
+}
+
+func handleClient(client net.Conn, messages *[]*string, files *[]*File, clients *[]*net.Conn) {
+
+}
+
+func showMessagesAndFiles(messages *[]*string, files *[]*File) {
+
+}
+
+func backupMessagesAndFiles(messages *[]*string, files *[]*File) {
 
 }
 
@@ -16,11 +41,14 @@ func main() {
 		return
 	}
 
-	go server(serverListener)
-
 	var (
-		opt int = 0
+		opt      int = 0
+		messages []*string
+		files    []*File
+		clients  []*net.Conn
 	)
+
+	go server(serverListener, &messages, &files, &clients)
 
 	for opt != 3 {
 		fmt.Println("ChatRoom Server Dashboard")
