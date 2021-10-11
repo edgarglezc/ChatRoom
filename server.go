@@ -1,39 +1,24 @@
 package main
 
 import (
+	"encoding/gob"
 	"fmt"
 	"net"
 )
 
 type Request struct {
-	Id        int
-	name      string
-	extension string
-	data      []byte
+	Type    int
+	Client  string
+	Message string
+	Data    []byte
 }
 
-func server(serverListener net.Listener) {
-	for {
-		client, err := serverListener.Accept()
-		if err != nil {
-			fmt.Println("Error connecting with client: ", err)
-			continue
-		}
-		go handleClient(client, messages, files, clients)
-	}
-}
-
-func handleClient(client net.Conn, messages *[]*string, files *[]*File, clients *[]*net.Conn) {
-
-}
-
-func showMessagesAndFiles(messages *[]*string, files *[]*File) {
-
-}
-
-func backupMessagesAndFiles(messages *[]*string, files *[]*File) {
-
-}
+const (
+	CONNECTION    int = 1
+	DISCONNECTION     = 2
+	MESSAGE           = 3
+	FILE              = 4
+)
 
 func main() {
 	serverListener, err := net.Listen("tcp", ":9999")
@@ -45,7 +30,7 @@ func main() {
 	clients := make(map[string]net.Conn)
 	opt := 0
 
-	go server(serverListener)
+	go server(serverListener, clients)
 
 	for opt != 3 {
 		fmt.Println("ChatRoom Server Dashboard")
@@ -64,6 +49,40 @@ func main() {
 			fmt.Println("se terminó el server")
 		default:
 			fmt.Println("Option not found")
+		}
+	}
+}
+
+func server(serverListener net.Listener, clients map[string]net.Conn) {
+	for {
+		client, err := serverListener.Accept()
+		if err != nil {
+			fmt.Println("Error connecting with client: ", err)
+			continue
+		}
+		go handleClient(client, clients)
+	}
+}
+
+func handleClient(client net.Conn, clients map[string]net.Conn) {
+	for {
+		var request Request
+		err := gob.NewDecoder(client).Decode(&request)
+		if err != nil {
+			fmt.Println("Error decoding request: ", err.Error())
+			continue
+		}
+		switch request.Type {
+		case CONNECTION:
+			clients[request.Client] = client
+			fmt.Printf("%s has arrived to the ChatRoom!\n", request.Client)
+		case DISCONNECTION:
+			delete(clients, request.Client)
+			fmt.Printf("%s has disconnected from the ChatRoom!\n", request.Client)
+		case MESSAGE:
+		case FILE:
+		default:
+			fmt.Println("An error has ocurred...")
 		}
 	}
 }
