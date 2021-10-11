@@ -15,6 +15,15 @@ type Request struct {
 	Data    []byte
 }
 
+func (r *Request) Show() string {
+	var msg string
+	switch r.Type {
+	case MESSAGE:
+		msg = r.Client + ": " + r.Message
+	}
+	return msg
+}
+
 const (
 	CONNECTION    int = 1
 	DISCONNECTION     = 2
@@ -45,16 +54,15 @@ func main() {
 		fmt.Println("[2] Send file")
 		fmt.Println("[3] Show messages")
 		fmt.Println("[4] Exit chat room")
-		fmt.Print("=> ")
 		fmt.Scanln(&opt)
 
 		switch opt {
 		case 1:
-			sendMessage(clientDial, name)
+			sendMessage(clientDial, name, &requests)
 		case 2:
 			fmt.Println("enviando archivo")
 		case 3:
-			fmt.Println("mostrando mensajes")
+			showMessages(&requests)
 		case 4:
 			disconnection(clientDial, name)
 		default:
@@ -67,13 +75,28 @@ func main() {
 
 func client(clientDial net.Conn, requests *[]Request, name string) {
 	for {
+		var request Request
+		err := gob.NewDecoder(clientDial).Decode(&request)
+		if err != nil {
+			fmt.Println("Error decoding request: ", err)
+			continue
+		}
 
+		switch request.Type {
+		case CONNECTION:
+		case DISCONNECTION:
+		case MESSAGE:
+			*requests = append(*requests, request)
+		case FILE:
+		default:
+			fmt.Println("An error has ocurred...")
+		}
 	}
 }
 
 func connection(clientDial net.Conn, name string) {
 	r := Request{
-		Type:   1,
+		Type:   CONNECTION,
 		Client: name,
 	}
 	err := gob.NewEncoder(clientDial).Encode(r)
@@ -82,7 +105,7 @@ func connection(clientDial net.Conn, name string) {
 	}
 }
 
-func sendMessage(clientDial net.Conn, name string) {
+func sendMessage(clientDial net.Conn, name string, requests *[]Request) {
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Print("Write something:")
 	scanner.Scan()
@@ -98,6 +121,8 @@ func sendMessage(clientDial net.Conn, name string) {
 	if err != nil {
 		fmt.Println("Error sending message: ", err)
 	}
+
+	*requests = append(*requests, r)
 }
 
 func disconnection(clientDial net.Conn, name string) {
@@ -109,5 +134,11 @@ func disconnection(clientDial net.Conn, name string) {
 	if err != nil {
 		fmt.Println("Error sending request: ", err)
 		return
+	}
+}
+
+func showMessages(requests *[]Request) {
+	for _, v := range *requests {
+		fmt.Println(v.Show())
 	}
 }

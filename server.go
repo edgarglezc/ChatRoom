@@ -28,16 +28,16 @@ func main() {
 	}
 
 	clients := make(map[string]net.Conn)
+	requests := make([]Request, 0)
 	opt := 0
 
-	go server(serverListener, clients)
+	go server(serverListener, clients, &requests)
 
 	for opt != 3 {
 		fmt.Println("ChatRoom Server Dashboard")
 		fmt.Println("[1] Show messages/files")
 		fmt.Println("[2] Backup messages/files")
 		fmt.Println("[3] End server")
-		fmt.Print("=> ")
 		fmt.Scanln(&opt)
 
 		switch opt {
@@ -53,18 +53,18 @@ func main() {
 	}
 }
 
-func server(serverListener net.Listener, clients map[string]net.Conn) {
+func server(serverListener net.Listener, clients map[string]net.Conn, requests *[]Request) {
 	for {
 		client, err := serverListener.Accept()
 		if err != nil {
 			fmt.Println("Error connecting with client: ", err)
 			continue
 		}
-		go handleClient(client, clients)
+		go handleClient(client, clients, requests)
 	}
 }
 
-func handleClient(client net.Conn, clients map[string]net.Conn) {
+func handleClient(client net.Conn, clients map[string]net.Conn, requests *[]Request) {
 	for {
 		var request Request
 		err := gob.NewDecoder(client).Decode(&request)
@@ -79,10 +79,25 @@ func handleClient(client net.Conn, clients map[string]net.Conn) {
 		case DISCONNECTION:
 			delete(clients, request.Client)
 			fmt.Printf("%s has disconnected from the ChatRoom!\n", request.Client)
+			return
 		case MESSAGE:
+			*requests = append(*requests, request)
+			sendMessages(client, clients, request)
 		case FILE:
 		default:
 			fmt.Println("An error has ocurred...")
+		}
+	}
+}
+
+func sendMessages(client net.Conn, clients map[string]net.Conn, request Request) {
+	for id, conn := range clients {
+		if request.Client != id {
+			err := gob.NewEncoder(conn).Encode(&request)
+			if err != nil {
+				fmt.Println("Error encoding request: ", err)
+				continue
+			}
 		}
 	}
 }
