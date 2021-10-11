@@ -5,13 +5,14 @@ import (
 	"net"
 )
 
-type File struct {
+type Request struct {
+	Id        int
 	name      string
 	extension string
 	data      []byte
 }
 
-func server(serverListener net.Listener, messages *[]*string, files *[]*File, clients *[]*net.Conn) {
+func server(serverListener net.Listener) {
 	for {
 		client, err := serverListener.Accept()
 		if err != nil {
@@ -41,14 +42,10 @@ func main() {
 		return
 	}
 
-	var (
-		opt      int = 0
-		messages []*string
-		files    []*File
-		clients  []*net.Conn
-	)
+	clients := make(map[string]net.Conn)
+	opt := 0
 
-	go server(serverListener, &messages, &files, &clients)
+	go server(serverListener)
 
 	for opt != 3 {
 		fmt.Println("ChatRoom Server Dashboard")

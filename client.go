@@ -11,7 +11,7 @@ type File struct {
 	data      []byte
 }
 
-func client(clientDial net.Conn, messages *[]*string, files *[]*File) {
+func client(clientDial net.Conn, clients map[string]net.Conn, requests *[]Request) {
 
 }
 
@@ -30,13 +30,11 @@ func main() {
 		return
 	}
 
-	var (
-		opt      int = 0
-		messages []*string
-		files    []*File
-	)
+	opt := 0
+	clients := make(map[string]net.Conn)
+	requests := make([]Request, 0)
 
-	go client(clientDial, &messages, &files)
+	go client(clientDial, clients, &requests)
 
 	for opt != 4 {
 		fmt.Println("Welcome to the ChatRoom!")
