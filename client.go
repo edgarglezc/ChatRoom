@@ -18,8 +18,14 @@ type Request struct {
 func (r *Request) Show() string {
 	var msg string
 	switch r.Type {
+	case CONNECTION:
+		msg = r.Client + " has arrived to the ChatRoom!"
+	case DISCONNECTION:
+		msg = r.Client + " has disconnected from the ChatRoom!"
 	case MESSAGE:
 		msg = r.Client + ": " + r.Message
+	case FILE:
+		msg = r.Client + " has sent a file: " + r.Message
 	}
 	return msg
 }
@@ -60,7 +66,7 @@ func main() {
 		case 1:
 			sendMessage(clientDial, name, &requests)
 		case 2:
-			fmt.Println("enviando archivo")
+			sendFile(clientDial, name, &requests)
 		case 3:
 			showMessages(&requests)
 		case 4:
@@ -76,21 +82,15 @@ func main() {
 func client(clientDial net.Conn, requests *[]Request, name string) {
 	for {
 		var request Request
+
 		err := gob.NewDecoder(clientDial).Decode(&request)
 		if err != nil {
 			fmt.Println("Error decoding request: ", err)
 			continue
 		}
 
-		switch request.Type {
-		case CONNECTION:
-		case DISCONNECTION:
-		case MESSAGE:
-			*requests = append(*requests, request)
-		case FILE:
-		default:
-			fmt.Println("An error has ocurred...")
-		}
+		fmt.Println(request.Show())
+		*requests = append(*requests, request)
 	}
 }
 
@@ -107,7 +107,7 @@ func connection(clientDial net.Conn, name string) {
 
 func sendMessage(clientDial net.Conn, name string, requests *[]Request) {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print("Write something:")
+	fmt.Print("Write something: ")
 	scanner.Scan()
 	msg := scanner.Text()
 
@@ -123,6 +123,31 @@ func sendMessage(clientDial net.Conn, name string, requests *[]Request) {
 	}
 
 	*requests = append(*requests, r)
+}
+
+func sendFile(clientDial net.Conn, name string, requests *[]Request) {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("Enter filename: ")
+	scanner.Scan()
+	fileName := scanner.Text()
+
+	fileData, err := os.ReadFile(fileName)
+	if err != nil {
+		fmt.Println("An error has ocurred trying to open the file: ", err)
+		return
+	}
+
+	r := Request{
+		Type:    FILE,
+		Client:  name,
+		Message: fileName,
+		Data:    fileData,
+	}
+
+	err = gob.NewEncoder(clientDial).Encode(r)
+	if err != nil {
+		fmt.Println("Error sending file: ", err)
+	}
 }
 
 func disconnection(clientDial net.Conn, name string) {

@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"net"
+	"os"
 )
 
 type Request struct {
@@ -11,6 +12,21 @@ type Request struct {
 	Client  string
 	Message string
 	Data    []byte
+}
+
+func (r *Request) Show() string {
+	var msg string
+	switch r.Type {
+	case CONNECTION:
+		msg = r.Client + " has arrived to the ChatRoom!"
+	case DISCONNECTION:
+		msg = r.Client + " has disconnected from the ChatRoom!"
+	case MESSAGE:
+		msg = r.Client + ": " + r.Message
+	case FILE:
+		msg = r.Client + " has sent a file: " + r.Message
+	}
+	return msg
 }
 
 const (
@@ -42,11 +58,11 @@ func main() {
 
 		switch opt {
 		case 1:
-			fmt.Println("mensajes")
+			showRequests(&requests)
 		case 2:
-			fmt.Println("respaldo mensajes")
+			backupRequests(clients, &requests)
 		case 3:
-			fmt.Println("se terminó el server")
+			endServer(clients)
 		default:
 			fmt.Println("Option not found")
 		}
@@ -72,25 +88,81 @@ func handleClient(client net.Conn, clients map[string]net.Conn, requests *[]Requ
 			fmt.Println("Error decoding request: ", err.Error())
 			continue
 		}
-		switch request.Type {
-		case CONNECTION:
+
+		if request.Type == CONNECTION {
 			clients[request.Client] = client
-			fmt.Printf("%s has arrived to the ChatRoom!\n", request.Client)
-		case DISCONNECTION:
+		}
+
+		if request.Type == DISCONNECTION {
 			delete(clients, request.Client)
-			fmt.Printf("%s has disconnected from the ChatRoom!\n", request.Client)
+			sendRequest(client, clients, request)
+			fmt.Println(request.Show())
 			return
-		case MESSAGE:
-			*requests = append(*requests, request)
-			sendMessages(client, clients, request)
-		case FILE:
-		default:
-			fmt.Println("An error has ocurred...")
+		}
+
+		*requests = append(*requests, request)
+		sendRequest(client, clients, request)
+		fmt.Println(request.Show())
+	}
+}
+
+func showRequests(requests *[]Request) {
+	for _, v := range *requests {
+		fmt.Println(v.Show())
+	}
+}
+
+func backupRequests(clients map[string]net.Conn, requests *[]Request) {
+	_, err := os.Stat("backup")
+	if os.IsNotExist(err) {
+		os.Mkdir("backup", 0755)
+	}
+
+	file, err := os.Create("./backup/backup.txt")
+	if err != nil {
+		fmt.Println("Error creating backup file: ", err)
+		return
+	}
+	defer file.Close()
+
+	for _, v := range *requests {
+		file.WriteString(v.Show() + "\n")
+	}
+
+	backupFiles(clients, requests)
+}
+
+func backupFiles(clients map[string]net.Conn, requests *[]Request) {
+	_, err := os.Stat("received_files")
+	if os.IsNotExist(err) {
+		os.Mkdir("received_files", 0755)
+	}
+
+	for id, _ := range clients {
+		clientDirPath := "./received_files/" + id
+		_, err := os.Stat(clientDirPath)
+		if os.IsNotExist(err) {
+			os.Mkdir(clientDirPath, 0755)
+		}
+	}
+
+	for id, _ := range clients {
+		clientDirPath := "./received_files/" + id
+		for _, v := range *requests {
+			if v.Client != id && v.Type == FILE {
+				file, err := os.Create(clientDirPath + "/" + v.Client + "_" + v.Message)
+				if err != nil {
+					fmt.Println("Error creating request file: ", err)
+					continue
+				}
+				defer file.Close()
+				file.WriteString(string(v.Data))
+			}
 		}
 	}
 }
 
-func sendMessages(client net.Conn, clients map[string]net.Conn, request Request) {
+func sendRequest(client net.Conn, clients map[string]net.Conn, request Request) {
 	for id, conn := range clients {
 		if request.Client != id {
 			err := gob.NewEncoder(conn).Encode(&request)
@@ -100,4 +172,8 @@ func sendMessages(client net.Conn, clients map[string]net.Conn, request Request)
 			}
 		}
 	}
+}
+
+func endServer(clients map[string]net.Conn) {
+
 }
