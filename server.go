@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 )
 
 type Request struct {
@@ -34,6 +35,7 @@ const (
 	DISCONNECTION     = 2
 	MESSAGE           = 3
 	FILE              = 4
+	END               = 5
 )
 
 func main() {
@@ -61,6 +63,7 @@ func main() {
 			showRequests(&requests)
 		case 2:
 			backupRequests(clients, &requests)
+			fmt.Println("Backup created!")
 		case 3:
 			endServer(clients)
 		default:
@@ -95,6 +98,7 @@ func handleClient(client net.Conn, clients map[string]net.Conn, requests *[]Requ
 
 		if request.Type == DISCONNECTION {
 			delete(clients, request.Client)
+			*requests = append(*requests, request)
 			sendRequest(client, clients, request)
 			fmt.Println(request.Show())
 			return
@@ -107,9 +111,11 @@ func handleClient(client net.Conn, clients map[string]net.Conn, requests *[]Requ
 }
 
 func showRequests(requests *[]Request) {
+	fmt.Println("------------------")
 	for _, v := range *requests {
 		fmt.Println(v.Show())
 	}
+	fmt.Println("------------------")
 }
 
 func backupRequests(clients map[string]net.Conn, requests *[]Request) {
@@ -150,7 +156,8 @@ func backupFiles(clients map[string]net.Conn, requests *[]Request) {
 		clientDirPath := "./received_files/" + id
 		for _, v := range *requests {
 			if v.Client != id && v.Type == FILE {
-				file, err := os.Create(clientDirPath + "/" + v.Client + "_" + v.Message)
+				date := getDate()
+				file, err := os.Create(clientDirPath + "/" + v.Client + "_" + date + "_" + v.Message)
 				if err != nil {
 					fmt.Println("Error creating request file: ", err)
 					continue
@@ -162,18 +169,37 @@ func backupFiles(clients map[string]net.Conn, requests *[]Request) {
 	}
 }
 
+func getDate() string {
+	time := time.Now().Format("01022006150405")
+	return time
+}
+
 func sendRequest(client net.Conn, clients map[string]net.Conn, request Request) {
-	for id, conn := range clients {
-		if request.Client != id {
-			err := gob.NewEncoder(conn).Encode(&request)
-			if err != nil {
-				fmt.Println("Error encoding request: ", err)
-				continue
-			}
+	for _, conn := range clients {
+		err := gob.NewEncoder(conn).Encode(&request)
+		if err != nil {
+			fmt.Println("Error encoding request: ", err)
+			continue
 		}
 	}
 }
 
 func endServer(clients map[string]net.Conn) {
+	r := Request{
+		Type:    END,
+		Message: "The session was ended forcefully by the server",
+	}
 
+	for id, conn := range clients {
+		err := gob.NewEncoder(conn).Encode(&r)
+		if err != nil {
+			fmt.Println("Error ending session with client: ", err)
+			continue
+		}
+		delete(clients, id)
+		defer conn.Close()
+	}
+
+	fmt.Println("The ChatRoom has ended!")
+	os.Exit(0)
 }

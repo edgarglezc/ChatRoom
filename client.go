@@ -26,6 +26,8 @@ func (r *Request) Show() string {
 		msg = r.Client + ": " + r.Message
 	case FILE:
 		msg = r.Client + " has sent a file: " + r.Message
+	case END:
+		msg = r.Message
 	}
 	return msg
 }
@@ -35,6 +37,7 @@ const (
 	DISCONNECTION     = 2
 	MESSAGE           = 3
 	FILE              = 4
+	END               = 5
 )
 
 func main() {
@@ -55,7 +58,7 @@ func main() {
 	go client(clientDial, &requests, name)
 
 	for opt != 4 {
-		fmt.Println("Welcome to the ChatRoom!")
+		fmt.Println("Welcome to the ChatRoom, " + name + "!")
 		fmt.Println("[1] Send message")
 		fmt.Println("[2] Send file")
 		fmt.Println("[3] Show messages")
@@ -71,6 +74,7 @@ func main() {
 			showMessages(&requests)
 		case 4:
 			disconnection(clientDial, name)
+			fmt.Println("See you soon!")
 		default:
 			fmt.Println("Option not found")
 		}
@@ -89,8 +93,16 @@ func client(clientDial net.Conn, requests *[]Request, name string) {
 			continue
 		}
 
-		fmt.Println(request.Show())
+		if request.Type == END {
+			fmt.Println(request.Show())
+			clientDial.Close()
+			os.Exit(0)
+		}
+
 		*requests = append(*requests, request)
+		if request.Client != name {
+			fmt.Println(request.Show())
+		}
 	}
 }
 
@@ -121,13 +133,11 @@ func sendMessage(clientDial net.Conn, name string, requests *[]Request) {
 	if err != nil {
 		fmt.Println("Error sending message: ", err)
 	}
-
-	*requests = append(*requests, r)
 }
 
 func sendFile(clientDial net.Conn, name string, requests *[]Request) {
 	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println("Enter filename: ")
+	fmt.Print("Enter filename: ")
 	scanner.Scan()
 	fileName := scanner.Text()
 
@@ -163,7 +173,9 @@ func disconnection(clientDial net.Conn, name string) {
 }
 
 func showMessages(requests *[]Request) {
+	fmt.Println("------------------")
 	for _, v := range *requests {
 		fmt.Println(v.Show())
 	}
+	fmt.Println("------------------")
 }
